@@ -14,7 +14,7 @@
 // Total number of cells
 #define BOARD_SIZE_2D (BOARD_SIZE_1D * BOARD_SIZE_1D)
 // Total number of mines
-#define MINE_COUNT (BOARD_SIZE_2D / 10)
+#define MINE_COUNT 40
 // Size of Cell in pixels
 #define CELL_SIZE_PX (BOARD_LENGTH_PX / BOARD_SIZE_1D)
 // The y value of where the board starts
@@ -37,16 +37,15 @@ typedef struct {
 typedef struct {
     bool gameOver;
     bool isBoardGenerated;
-    // number of flags currently placed
+    // number of flags remaining; available to place
     uint8_t flagCount;
     Texture2D texAtlas;
     Cell_t **board;
 } GameState_t;
 
-// This function assumes the board has already been allocated in memory.
-// Generates the mines with a buffer zone around the given position.
-void gen_minefield(Cell_t **board, int row, int col) {
-    // Set every cell to a "default" cell
+// Generates the default, or clear board. Basically copying every array position with a default struct
+void clear_board(Cell_t **board) {
+        // Set every cell to a "default" cell
     for (int row = 0; row < BOARD_SIZE_1D; row++) {
         for (int col = 0; col < BOARD_SIZE_1D; col++) {
             board[row][col] = (Cell_t) {
@@ -59,15 +58,79 @@ void gen_minefield(Cell_t **board, int row, int col) {
             };
         }
     }
+}
 
+void recursive_flood_clear(GameState_t *gameState, int row, int col);
+
+void recursive_flood_clear(GameState_t *gameState, int row, int col) {
+    Cell_t *currCell = &gameState->board[row][col];
+    if (currCell->isRevealed 
+        || currCell->isFlagged
+        || row < 0 
+        || row > 15 
+        || col < 0 
+        || col > 15) {
+        return;
+    }
+
+    currCell->isRevealed = true;
+    if (currCell->isMine) {
+        gameState->gameOver = true;
+        return;
+    }
+
+    if (currCell->dangerLevel > 0) {
+        return;
+    }
+    
+    // check neighbors and repeat
+
+    // up
+    if (col - 1 >= 0) {
+        recursive_flood_clear(gameState, row, col - 1);
+    }
+    // down
+    if (col + 1 <= 15) {
+        recursive_flood_clear(gameState, row, col + 1);
+    }
+    // left
+    if (row - 1 >= 0) {
+        recursive_flood_clear(gameState, row - 1, col);
+    }
+    // right
+    if (row + 1 <= 15) {
+        recursive_flood_clear(gameState, row + 1, col);
+    }
+}
+
+void clear_cell(GameState_t *gameState, Cell_t *cell, int row, int col) {
+    // recursive step, clear tiles up until the edge of where they have 0 danger level
+    recursive_flood_clear(gameState, row, col);
+}
+
+// This function assumes the board has already been allocated in memory.
+// Generates the mines with a buffer zone around the given position.
+void gen_minefield(Cell_t **board, int row, int col) {
     // Place the mines
     int placed = 0;
     while (placed < MINE_COUNT) {
+        // Silly edge condition
+        if (placed > BOARD_SIZE_2D) {
+            break;
+        }
+
         int randRow = rand() % BOARD_SIZE_1D;
         int randCol = rand() % BOARD_SIZE_1D;
 
-        if (abs(randRow - row) < 6 || abs(randCol - col) < 6) {
-            continue;
+        // Area of "safety" where no mines generate around initial mouse click
+        // Or whatever position the (row, col) params are for
+
+        if (row != -1 && col != -1) {
+            const int safeDist = 3;
+
+            if (abs(randRow - row) < safeDist && abs(randCol - col) < safeDist) {
+                continue;
+            }
         }
 
         if (!board[randRow][randCol].isMine) {
@@ -100,7 +163,7 @@ void gen_minefield(Cell_t **board, int row, int col) {
                     if (checkRow < 0 
                         || checkRow > 15 
                         || checkCol < 0 
-                        || checkRow > 15) {
+                        || checkCol > 15) {
                         continue;
                     }
 
@@ -151,7 +214,7 @@ Color get_danger_color(int dangerLevel) {
         case 7:
             return BLACK;
         case 8:
-            return GRAY;
+            return DARKGRAY;
         default:
             return PINK;
     }
@@ -196,7 +259,7 @@ void init(GameState_t *gameState) {
     }
 
     gameState->isBoardGenerated = false;
-    gameState->flagCount = 0;
+    gameState->flagCount = MINE_COUNT;
     gameState->texAtlas = LoadTexture("atlas.png");
 
     // Allocate rows
@@ -216,8 +279,7 @@ void init(GameState_t *gameState) {
 
     // Seed our RNG for all board generations
     srand((unsigned int) time(NULL));
-
-    gen_minefield(gameState->board, 0, 0);
+    clear_board(gameState->board);
 }
 
 void update(GameState_t *gameState) {
@@ -241,19 +303,19 @@ void update(GameState_t *gameState) {
 
     Cell_t *targetCell = &gameState->board[row][col];
 
+    // check mouse clicks, left click to clear cells and right click to flag cells
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-        if (!targetCell->isFlagged) {
-            targetCell->isRevealed = true;
-
-            if (targetCell->isMine) {
-                gameState->gameOver = true;
-            }
+        // Initial mouse click
+        if (!gameState->isBoardGenerated) {
+            gen_minefield(gameState->board, row, col);
+            gameState->isBoardGenerated = true;
         }
 
-        return;
-    }
+        if (!targetCell->isFlagged) {
+            clear_cell(gameState, targetCell, row, col);
+        }
 
-    if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
+    } else if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
         if (targetCell->isRevealed || gameState->flagCount <= 0) {
             return;
         }
@@ -265,8 +327,6 @@ void update(GameState_t *gameState) {
             gameState->flagCount++;
             targetCell->isFlagged = true;
         }
-
-        return;
     }
 
     /**
@@ -279,10 +339,22 @@ void update(GameState_t *gameState) {
      */
 
     if (IsKeyReleased(KEY_R)) {
-        gen_minefield(gameState->board, 0, 0);
+        if (!gameState->isBoardGenerated) {
+            return;
+        }
+
+        // clears previous board
+        clear_board(gameState->board);
+        // places mines
+        gen_minefield(gameState->board, -1, -1);
     }
 
     if (IsKeyReleased(KEY_T)) {
+        if (!gameState->isBoardGenerated) {
+            return;
+        }
+
+        // reveal every cell
         for (int row = 0; row < BOARD_SIZE_1D; row++) {
             for (int col = 0; col < BOARD_SIZE_1D; col++) {
                 gameState->board[row][col].isRevealed = true;
@@ -295,7 +367,7 @@ void render(GameState_t *gameState) {
     ClearBackground(RAYWHITE);
     
     char buf[16];
-    snprintf(buf, sizeof(buf), "Flags: %d", MINE_COUNT - gameState->flagCount);
+    snprintf(buf, sizeof(buf), "Flags: %d", gameState->flagCount);
     DrawText(buf, 2, 2, 24, BLACK);
 
     // mine
