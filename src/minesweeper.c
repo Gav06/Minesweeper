@@ -102,12 +102,6 @@ void recursive_flood_clear(GameState_t *gameState, int row, int col) {
         recursive_flood_clear(gameState, row + 1, col);
     }
 }
-
-void clear_cell(GameState_t *gameState, Cell_t *cell, int row, int col) {
-    // recursive step, clear tiles up until the edge of where they have 0 danger level
-    recursive_flood_clear(gameState, row, col);
-}
-
 // This function assumes the board has already been allocated in memory.
 // Generates the mines with a buffer zone around the given position.
 void gen_minefield(Cell_t **board, int row, int col) {
@@ -312,7 +306,7 @@ void update(GameState_t *gameState) {
         }
 
         if (!targetCell->isFlagged) {
-            clear_cell(gameState, targetCell, row, col);
+            recursive_flood_clear(gameState, row, col);
         }
 
     } else if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
