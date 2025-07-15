@@ -206,8 +206,7 @@ Color get_danger_color(int dangerLevel) {
         case 5:
             return MAROON;
         case 6:
-        // cyan
-            return (Color) { 0, 255, 255, 255 };
+            return (Color) { 0, 255, 255, 255 }; // CYAN
         case 7:
             return BLACK;
         case 8:
@@ -319,10 +318,10 @@ void update(GameState_t *gameState) {
         }
 
         if (targetCell->isFlagged) {
-            gameState->flagCount--;
+            gameState->flagCount++;
             targetCell->isFlagged = false;
         } else {
-            gameState->flagCount++;
+            gameState->flagCount--;
             targetCell->isFlagged = true;
         }
     }
@@ -364,8 +363,8 @@ void update(GameState_t *gameState) {
 void render(GameState_t *gameState) {
     ClearBackground(RAYWHITE);
     
-    char buf[16];
-    snprintf(buf, sizeof(buf), "Flags: %d", gameState->flagCount);
+    char buf[24];
+    snprintf(buf, sizeof(buf), "Flags left: %d", gameState->flagCount);
     DrawText(buf, 2, 2, 24, BLACK);
 
     // mine
