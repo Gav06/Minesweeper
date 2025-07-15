@@ -149,6 +149,7 @@ void gen_minefield(Cell_t **board, int row, int col) {
             // check every adjacent cell
             int dangerLevel = 0;
 
+            // Loop through each neighboring cell to count
             for (int r = 0; r < 3; r++) {
                 for (int c = 0; c < 3; c++) {
                     int checkRow = cell->row - 1 + r;
@@ -174,6 +175,8 @@ void gen_minefield(Cell_t **board, int row, int col) {
     }
 }
 
+// Simple function to resolve the location of the needed
+// sprite on the texture atlas depending on conditions
 Rectangle find_cell_sprite(Cell_t *cell) {
     if (cell->isRevealed) {
         if (cell->isMine) {
@@ -238,6 +241,7 @@ void draw_minefield(GameState_t *gameState) {
             }
             
             // convert the int to ascii (at least for only the first digit)
+            // So we can display the danger level
             char digit = currCell->dangerLevel + '0';
             char line[] = { digit, '\0' };
             DrawText(line, cellX + 10, cellY + 6, 24, get_danger_color(currCell->dangerLevel));
