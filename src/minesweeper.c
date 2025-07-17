@@ -60,9 +60,10 @@ void clear_board(Cell_t **board) {
     }
 }
 
-void recursive_flood_clear(GameState_t *gameState, int row, int col);
-
-void recursive_flood_clear(GameState_t *gameState, int row, int col) {
+// duplicate definition, necessary for recursive calls
+bool recursive_flood_clear(GameState_t *gameState, int row, int col);
+// returns TRUE if the clicked cell contains a mine
+bool recursive_flood_clear(GameState_t *gameState, int row, int col) {
     Cell_t *currCell = &gameState->board[row][col];
     if (currCell->isRevealed 
         || currCell->isFlagged
@@ -70,37 +71,32 @@ void recursive_flood_clear(GameState_t *gameState, int row, int col) {
         || row > 15 
         || col < 0 
         || col > 15) {
-        return;
+        return false;
     }
 
     currCell->isRevealed = true;
     if (currCell->isMine) {
         gameState->gameOver = true;
-        return;
+        return true;
     }
 
     if (currCell->dangerLevel > 0) {
-        return;
+        return false;
     }
     
     // check neighbors and repeat
+    
+    for (int c = col - 1; c <= col + 1; c++) {
+        for (int r = row - 1; r <= row + 1; r++) {
+            if (c < 0 || c > 15 || r < 0 || r > 15) {
+                continue;
+            } 
 
-    // up
-    if (col - 1 >= 0) {
-        recursive_flood_clear(gameState, row, col - 1);
+            recursive_flood_clear(gameState, r, c);
+        }
     }
-    // down
-    if (col + 1 <= 15) {
-        recursive_flood_clear(gameState, row, col + 1);
-    }
-    // left
-    if (row - 1 >= 0) {
-        recursive_flood_clear(gameState, row - 1, col);
-    }
-    // right
-    if (row + 1 <= 15) {
-        recursive_flood_clear(gameState, row + 1, col);
-    }
+    
+    return false;
 }
 // This function assumes the board has already been allocated in memory.
 // Generates the mines with a buffer zone around the given position.
@@ -248,6 +244,10 @@ void draw_minefield(GameState_t *gameState) {
     }
 }
 
+void game_over(GameState_t *gameState) {
+    printf("you died!!!!!\n");
+}
+
 // load textures & generate minefield pattern (temporarily)
 void init(GameState_t *gameState) {
     if (!gameState) {
@@ -309,7 +309,9 @@ void update(GameState_t *gameState) {
         }
 
         if (!targetCell->isFlagged) {
-            recursive_flood_clear(gameState, row, col);
+            if (recursive_flood_clear(gameState, row, col)) {
+                game_over(gameState);
+            }
         }
 
     } else if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
@@ -344,6 +346,8 @@ void update(GameState_t *gameState) {
         clear_board(gameState->board);
         // places mines
         gen_minefield(gameState->board, -1, -1);
+        // reset flag count (only amount of mines being generated for now is 40)
+        gameState->flagCount = MINE_COUNT;
     }
 
     if (IsKeyReleased(KEY_T)) {
